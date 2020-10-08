@@ -8,6 +8,7 @@ import (
     "image"
     "image/draw"
     "image/jpeg"
+    "mosaic/common"
     "net/http"
     "os"
     "strconv"
@@ -34,7 +35,7 @@ func Mosaic(w http.ResponseWriter, r *http.Request) {
     // 克隆目标图片用于绘制马赛克图片
     newimage := image.NewNRGBA(image.Rect(bounds.Min.X, bounds.Min.X, bounds.Max.X, bounds.Max.Y))
     // 克隆嵌入图片数据库
-    db := cloneTilesDB()
+    db := common.CloneTilesDB()
     // 从 (0, 0) 坐标开始将目标图片按照 tile_size 值均分成多个小区块
     sp := image.Point{0, 0}
     for y := bounds.Min.Y; y < bounds.Max.Y; y = y + tileSize {
@@ -43,13 +44,13 @@ func Mosaic(w http.ResponseWriter, r *http.Request) {
             r, g, b, _ := original.At(x, y).RGBA()
             color := [3]float64{float64(r), float64(g), float64(b)}
             // 从嵌入图片数据库获取平均颜色与之最接近的嵌入图片
-            nearest := nearest(color, &db)
+            nearest := db.Nearest(color)
             file, err := os.Open(nearest)
             if err == nil {
                 img, _, err := image.Decode(file)
                 if err == nil {
                     // 将嵌入图片调整到当前区块大小
-                    t := resize(img, tileSize)
+                    t := common.Resize(img, tileSize)
                     tile := t.SubImage(t.Bounds())
                     tileBounds := image.Rect(x, y, x+tileSize, y+tileSize)
                     // 然后将调整大小后的嵌入图片绘制到当前区块位置，从而真正嵌入到马赛克图片中
