@@ -1,4 +1,4 @@
-package sync
+package common
 
 import (
     "fmt"
@@ -7,14 +7,19 @@ import (
     "io/ioutil"
     "math"
     "os"
+    "sync"
 )
 
 var TILESDB map[string][3]float64
 
-func cloneTilesDB() map[string][3]float64 {
-    db := make(map[string][3]float64)
+func CloneTilesDB() DB {
+    store := make(map[string][3]float64)
     for k, v := range TILESDB {
-        db[k] = v
+        store[k] = v
+    }
+    db := DB{
+        store: store,
+        mutex: &sync.Mutex{},
     }
     return db
 }
@@ -32,7 +37,7 @@ func averageColor(img image.Image) [3]float64 {
     return [3]float64{r / totalPixels, g / totalPixels, b / totalPixels}
 }
 
-func resize(in image.Image, newWidth int) image.NRGBA {
+func Resize(in image.Image, newWidth int) image.NRGBA {
     bounds := in.Bounds()
     width := bounds.Max.X - bounds.Min.X
     ratio := width / newWidth
@@ -69,16 +74,18 @@ func TilesDB() map[string][3]float64 {
     return db
 }
 
-func nearest(target [3]float64, db *map[string][3]float64) string {
+func (db *DB) Nearest(target [3]float64) string {
     var filename string
+    db.mutex.Lock()
     smallest := 1000000.0
-    for k, v := range *db {
+    for k, v := range db.store {
         dist := distance(target, v)
         if dist < smallest {
             filename, smallest = k, dist
         }
     }
-    delete(*db, filename)
+    delete(db.store, filename)
+    db.mutex.Unlock()
     return filename
 }
 
@@ -88,4 +95,9 @@ func distance(p1 [3]float64, p2 [3]float64) float64 {
 
 func sq(n float64) float64 {
     return n * n
+}
+
+type DB struct {
+    mutex *sync.Mutex
+    store map[string][3]float64
 }
